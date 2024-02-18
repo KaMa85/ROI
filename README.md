@@ -1,7 +1,21 @@
 ROI Version: Mixed Reality App for Defect Quantification
 Overview
 This Mixed Reality application focuses on defect quantification, utilizing Canny Edge Detection with horizontal pixel-level analysis.
-An automatic Region of Interest (ROI) algorithm is integrated to improve processing time.
+An automatic Region of Interest (ROI) algorithm is integrated to improve processing time. The following videos shows how the ROI version improve the processing time:
+
+
+
+
+https://github.com/KaMa85/ROI/assets/82784239/b6d28e3e-6c15-442d-9995-fbf5e59e95cf
+
+
+
+
+https://github.com/KaMa85/ROI/assets/82784239/0ef86d42-0d79-4b3c-8d73-0f19820b748e
+
+
+
+ 
 
 Development Stage
 The application is in development and not final. It successfully implements defect detection and quantification but lacks perspective correction.
