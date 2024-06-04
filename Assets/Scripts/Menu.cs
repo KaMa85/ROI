@@ -46,9 +46,9 @@ public class Menu : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
-        GiveFloatToSlider(0, CM.MaxThicknessIn_mm);
-        GiveFloatToSlider(1, CM.Length_mm);
-        GiveFloatToSlider(2, CM.AverageThicknessIn_mm);
+        GiveFloatToSlider(0, CM.AverageThicknessIn_mm );
+        GiveFloatToSlider(1, CM.MaxThicknessIn_mm);
+        GiveFloatToSlider(2, CM.Length_mm);
         GiveFloatToSlider(3, CM.Area);
     }
 }

@@ -3,26 +3,26 @@ using System;
 using System.Linq;
 using UnityEngine.Windows.WebCam;
 
-
 public class SmartCrackMeasurement : MonoBehaviour
 {
     public string text;
     PhotoCapture photoCaptureObject = null;
     Texture2D targetTexture = null;
     public float DTC;
-    public float threshold1= 100000;
-    public float threshold2= 75000;
+    public float threshold1;
+    public float threshold2;
     public float MaxThicknessIn_mm;
-    public float p_min=2.0f;
-    public int mbatch;
+    public float p_min;
+    public int mbatch ;
     public int nbatch;
-    public int row_max=3;
+    public int row_max = 3;
     public float Length_mm;
     public float AverageThicknessIn_mm;
     public float Area;
     public int val;
     public Material OutputMaterial;
     public Texture2D StaticTexture;
+    public double ProcessingTime;
     int n1, n2, m1, m2, n_batch1, n_batch2, m_batch1, m_batch2;
     public string EvaluationResult;
     CameraParameters cameraParameters = new CameraParameters();
@@ -55,11 +55,12 @@ public class SmartCrackMeasurement : MonoBehaviour
     }
     private void Update()
     {
-       // Take a picture
+        // Take a picture
         photoCaptureObject.TakePhotoAsync(OnCapturedPhotoToMemory);
     }
     void OnCapturedPhotoToMemory(PhotoCapture.PhotoCaptureResult result, PhotoCaptureFrame photoCaptureFrame)
     {
+        DateTime start = DateTime.Now;
         // Copy the raw image data into our target texture
         photoCaptureFrame.UploadImageDataToTexture(targetTexture);
         // Copy the raw image data into our target texture
@@ -77,28 +78,48 @@ public class SmartCrackMeasurement : MonoBehaviour
         float[] Gy = new float[cols.Length];
         float[] G = new float[cols.Length];
         float[] teta = new float[cols.Length];
-        n1 = (int)(targetTexture.height / 10 * Mathf.Floor((10 - p) / 2)) + 00;
-        n2 = (int)(targetTexture.height / 10 * (10 - Mathf.Floor((10 - p) / 2))) - 00;
-        m1 = (int)(targetTexture.width / 10 * Mathf.Floor((10 - l) / 2)) + 00;
-        m2 = (int)(targetTexture.width / 10 * (10 - Mathf.Floor((10 - l) / 2))) - 00;
+        n1 = targetTexture.height / 10 * ((Mathf.FloorToInt((10 - p) / 2))) + 0;
+        n2 = targetTexture.height / 10 * (10 - (Mathf.FloorToInt((10 - p) / 2))) - 0;
+        m1 = targetTexture.width / 10 * ((Mathf.FloorToInt((10 - l) / 2))) + 0;
+        m2 = targetTexture.width / 10 * (10 - (Mathf.FloorToInt((10 - l) / 2))) - 0;
         n_batch1 = (int)Mathf.Floor(nbatch * n1 / targetTexture.height);
         n_batch2 = (int)Mathf.Floor(nbatch * n2 / targetTexture.height);
         m_batch1 = (int)Mathf.Floor(mbatch * m1 / targetTexture.width);
         m_batch2 = (int)Mathf.Floor(mbatch * m2 / targetTexture.width);
-        float[] k2 = new float[n2 - n1 + 400];
-        float[] k7 = new float[n2 - n1 + 400];
-        float[] k9 = new float[n2 - n1 + 400];
-        int[] s1 = new int[n2 - n1 + 400];
-        int[] s2 = new int[n2 - n1 + 400];
-        int[] s4 = new int[n2 - n1 + 400];
+        float[] k2 = new float[n2 - n1 + 1400];
+        float[] k7 = new float[n2 - n1 + 1400];
+        float[] k9 = new float[n2 - n1 + 1400];
+        int[] s1 = new int[n2 - n1 + 1400];
+        int[] s2 = new int[n2 - n1 + 1400];
+        int[] s4 = new int[n2 - n1 + 1400];
         int px = (int)(Mathf.Floor(targetTexture.width / mbatch));
         int py = (int)(Mathf.Floor(targetTexture.height / nbatch));
         int i, j = m_batch1;
-        int i_start;
         int b = 1;
         float sum = 0, max = 0;
-        float[] PP = new float[mbatch * nbatch + 5];
+        float[] PP = new float[nbatch * mbatch + 400];
         bool endLoop = false;
+        if (DTC > 1.5)
+        {
+            threshold1 = 11000;
+            threshold2 = 9000;
+        }
+        else if (DTC > 0.5 && DTC < 0.9)
+
+        {
+            threshold1 = 25000;
+            threshold2 = 20000;
+        }
+        else if (DTC < 0.5)
+        {
+            threshold1 = 40000;
+            threshold2 = 30000;
+        }
+        else
+        {
+            threshold1 = 20000;
+            threshold2 = 17000;
+        }
         // Loops over batches
         for (i = n_batch1; i < n_batch1 + row_max; ++i)
         {
@@ -153,7 +174,7 @@ public class SmartCrackMeasurement : MonoBehaviour
                         }
                     }
                 }
-                if (endLoop == true)
+                if (endLoop == true && j>m_batch1+1)
                 {
                     break;
                 }
@@ -170,11 +191,10 @@ public class SmartCrackMeasurement : MonoBehaviour
         if (j != m_batch2 + 1)
         {
             j--;
-            i_start = i;
-            for (i = i_start; i <= n_batch2; ++i)
+            for (int i2 = i; i2 <= n_batch2; ++i2)
             {
                 // Measurement
-                for (int k = py * (i - 1); k <= py * i - 1; ++k)
+                for (int k = py * (i2 - 1); k <= py * i2 - 1; ++k)
                 {
                     for (int pixel = px * (j - 2) + 1; pixel <= px * (j + 1) - 2; ++pixel)
                     {
@@ -182,69 +202,86 @@ public class SmartCrackMeasurement : MonoBehaviour
                         {
                             if ((G[k * targetTexture.width + pixel + 1] > threshold2 && G[k * targetTexture.width + pixel - 1] > threshold2) || (G[(k + 1) * targetTexture.width + pixel] > threshold2 && G[(k - 1) * targetTexture.width + pixel] > threshold2) || (G[(k + 1) * targetTexture.width + pixel - 1] > threshold2 & G[(k - 1) * targetTexture.width + pixel + 1] > threshold2) || (G[(k + 1) * targetTexture.width + pixel + 1] > threshold2 && G[(k - 1) * targetTexture.width + pixel - 1] > threshold2))
                             {
-                                s1[k - 1 + py - py * i_start] = pixel;
+                                s1[k + py - py * i] = pixel;
                                 ++pixel;
                                 while (G[k * targetTexture.width + pixel] > threshold1)
                                 {
                                     ++pixel;
                                 }
-                                s2[k - 1 + py - py * i_start] = pixel;
-                                while (G[k * targetTexture.width + pixel] < threshold1 && (pixel - s2[k - 1 + py - py * i_start]) < 25)
+                                s2[k + py - py * i] = pixel;
+                                while (G[k * targetTexture.width + pixel] < threshold1 && (pixel - s2[k + py - py * i]) < 30)
                                 {
                                     ++pixel;
                                 }
-                                if (pixel - s2[k - 1 + py - py * i_start] < 25 && pixel <= px * (j + 1) - 2)
+                                if (pixel - s2[k + py - py * i] < 30 && pixel <= px * (j + 1) - 2)
                                 {
                                     while (G[k * targetTexture.width + pixel] > threshold1)
                                     {
                                         ++pixel;
                                     }
-                                    s4[k - 1 + py - py * i_start] = pixel - 1;
-                                    k7[k - 1 + py - py * i_start] = Mathf.Cos(teta[k * targetTexture.width + s1[k - 1 + py - py * i_start]]);
-                                    k9[k - 1 + py - py * i_start] = Mathf.Cos(teta[k * targetTexture.width + pixel - 1]);
-                                    while (G[k * targetTexture.width + pixel] < threshold1 && (pixel - s2[k - 1 + py - py * i_start]) < 25)
+                                    s4[k + py - py * i] = pixel - 1;
+                                    k7[k + py - py * i] = Mathf.Cos(teta[k * targetTexture.width + s1[k + py - py * i]]);
+                                    k9[k + py - py * i] = Mathf.Cos(teta[k * targetTexture.width + pixel - 1]);
+                                    while (G[k * targetTexture.width + pixel] < threshold1 && (pixel - s2[k + py - py * i]) < 30)
                                     {
                                         ++pixel;
                                     }
-                                    if (pixel - s2[k - 1 + py - py * i_start] < 25)
+                                    if (pixel - s2[k + py - py * i] < 30)
                                     {
                                         while (G[k * targetTexture.width + pixel] > threshold1)
                                         {
                                             ++pixel;
                                         }
-                                        s4[k - 1 + py - py * i_start] = pixel - 1;
-                                        k7[k - 1 + py - py * i_start] = Mathf.Cos(teta[k * targetTexture.width + s1[k - 1 + py - py * i_start]]);
-                                        k9[k - 1 + py - py * i_start] = Mathf.Cos(teta[k * targetTexture.width + pixel - 1]);
+                                        s4[k + py - py * i] = pixel - 1;
+                                        k7[k + py - py * i] = Mathf.Cos(teta[k * targetTexture.width + s1[k + py - py * i]]);
+                                        k9[k + py - py * i] = Mathf.Cos(teta[k * targetTexture.width + pixel - 1]);
                                     }
-                                    k2[k - 1 + py - py * i_start] = (s4[k - 1 + py - py * i_start] - s2[k - 1 + py - py * i_start]);
-                                    for (int d = s2[k - 1 + py - py * i_start]; d <= s4[k - 1 + py - py * i_start]; ++d)
+                                    if (s4[k + py - py * i]- s2[k + py - py * i]!=30) 
                                     {
-                                        cols[k * targetTexture.width + d] = Color.red;
+                                        for (int d = s2[k + py - py * i]; d <= s4[k + py - py * i]; ++d)
+                                        {
+                                            cols[k * targetTexture.width + d] = Color.red;
+                                        }
                                     }
+                                    else
+                                    {
+                                        s4[k + py - py * i] = s2[k + py - py * i];
+                                        k7[k + py - py * i] = 0;
+                                        k9[k + py - py * i] = 0;
+                                    }
+                                    k2[k + py - py * i] = (s4[k + py - py * i] - s2[k + py - py * i]);
+                                    break;
                                 }
                             }
                         }
                     }
                 }
-                if (PP[i * mbatch + j - 1] >= PP[i * mbatch + j] && PP[i * mbatch + j - 1] >= PP[i * mbatch + j + 1])
+                if (PP[i2 * mbatch + j - 1] > PP[i2 * mbatch + j] && PP[i2 * mbatch + j - 1] >= PP[i2 * mbatch + j + 1])
                 {
-                    --j;
+                    if (j > 2)
+                    {
+                        --j;
+
+                    }
                 }
-                else if (PP[i * mbatch + j + 1] >= PP[i * mbatch + j] && PP[i * mbatch + j + 1] >= PP[i * mbatch + j - 1])
+                else if (PP[i2 * mbatch + j + 1] > PP[i2 * mbatch + j] && PP[i2 * mbatch + j + 1] > PP[i2 * mbatch + j - 1])
                 {
-                    ++j;
+                    if (j<mbatch-1)
+                    {
+                        ++j;
+                    }
                 }
-                for (int index = py * (i - 1) * targetTexture.width + px * (j - 2);
-                    index <= py * (i - 1) * targetTexture.width + px * (j + 1) - 1; index++)
+                for (int index = py * (i2 - 1) * targetTexture.width + px * (j - 2);
+                    index <= py * (i2 - 1) * targetTexture.width + px * (j + 1) - 1; index++)
                 {
                     cols[index] = Color.green;
                 }
-                for (int index = (py * i - 1) * targetTexture.width + px * (j - 2);
-                 index <= (py * i - 1) * targetTexture.width + px * (j + 1) - 1; index++)
+                for (int index = (py * i2 - 1) * targetTexture.width + px * (j - 2);
+                 index <= (py * i2 - 1) * targetTexture.width + px * (j + 1) - 1; index++)
                 {
                     cols[index] = Color.green;
                 }
-                for (int k = py * i - 1; k <= py * (i + 1) + 1; ++k)
+                for (int k = py * i2 - 1; k <= py * (i2 + 1) + 1; ++k)
                 {
                     cols[k * targetTexture.width + px * (j - 2) + 1] = Color.green;
                     cols[k * targetTexture.width + px * (j + 1) - 2] = Color.green;
@@ -254,7 +291,7 @@ public class SmartCrackMeasurement : MonoBehaviour
                             0.114f * cols[k * targetTexture.width + l].b;
                     }
                 }
-                for (int k = py * i; k <= py * (i + 1) - 1; ++k)
+                for (int k = py * i2; k <= py * (i2 + 1) - 1; ++k)
                 {
                     for (int l = px * (j - 2); l <= px * (j + 1) - 1; ++l)
                     {
@@ -263,7 +300,7 @@ public class SmartCrackMeasurement : MonoBehaviour
                         values[k * targetTexture.width + l] = (val[3] + val[4]) / 2;
                     }
                 }
-                for (int k = py * i; k <= py * (i + 1) - 1; ++k)
+                for (int k = py * i2; k <= py * (i2 + 1) - 1; ++k)
                 {
                     for (int l1 = px * (j - 2); l1 <= px * (j - 1) - 1; ++l1)
                     {
@@ -280,7 +317,7 @@ public class SmartCrackMeasurement : MonoBehaviour
                         teta[k * targetTexture.width + l1] = Mathf.Atan(Gy[k * targetTexture.width + l1] / Gx[k * targetTexture.width + l1]);
                         if (G[k * targetTexture.width + l1] >= threshold1)
                         {
-                            PP[(i + 1) * mbatch + j - 1]++;
+                            PP[(i2 + 1) * mbatch + j - 1]++;
                         }
                     }
                     for (int l2 = px * (j - 1); l2 <= px * j - 1; ++l2)
@@ -298,7 +335,7 @@ public class SmartCrackMeasurement : MonoBehaviour
                         teta[k * targetTexture.width + l2] = Mathf.Atan(Gy[k * targetTexture.width + l2] / Gx[k * targetTexture.width + l2]);
                         if (G[k * targetTexture.width + l2] >= threshold1)
                         {
-                            PP[(i + 1) * mbatch + j]++;
+                            PP[(i2 + 1) * mbatch + j]++;
                         }
                     }
                     for (int l3 = px * j; l3 <= px * (j + 1); ++l3)
@@ -316,11 +353,11 @@ public class SmartCrackMeasurement : MonoBehaviour
                         teta[k * targetTexture.width + l3] = Mathf.Atan(Gy[k * targetTexture.width + l3] / Gx[k * targetTexture.width + l3]);
                         if (G[k * targetTexture.width + l3] >= threshold1)
                         {
-                            PP[(i + 1) * mbatch + j + 1]++;
+                            PP[(i2 + 1) * mbatch + j + 1]++;
                         }
                     }
                 }
-                if (Mathf.Max(PP[(i + 1) * mbatch + j - 1], PP[(i + 1) * mbatch + j], PP[(i + 1) * mbatch + j + 1]) >= py * p_min)
+                if (Mathf.Max(PP[(i2 + 1) * mbatch + j - 1], PP[(i2 + 1) * mbatch + j], PP[(i2 + 1) * mbatch + j + 1]) >= py * p_min/3f)
                 {
                     b = 1;
                 }
@@ -338,7 +375,7 @@ public class SmartCrackMeasurement : MonoBehaviour
             float area = 0;
             for (int x = 0; x < n2 - n1; x++)
             {
-                if (k2[x] < 35 && k2[x] > 2)
+                if (k2[x] < 34 && k2[x] > 2)
                 {
                     n++;
                     sum += k2[x] * (k7[x] + k9[x]) / 2;
@@ -352,9 +389,8 @@ public class SmartCrackMeasurement : MonoBehaviour
             }
             if (n != 0)
             {
-                AverageThicknessIn_mm = ((sum / (n)) * 0.4f) * Mathf.Pow((DTC - 0.07f), 1f);
-
-                MaxThicknessIn_mm = (max * 0.4f) * Mathf.Pow((DTC - 0.07f), 1f);
+                AverageThicknessIn_mm = ((sum / (n)) * 0.3f) * Mathf.Pow((DTC - 0.07f), 0.82f);
+                MaxThicknessIn_mm = (max * 0.3f) * Mathf.Pow((DTC - 0.07f), 0.82f);
                 Length_mm = (n * 100 / (n2 - n1));
                 Area = (DTC);
             }
@@ -362,5 +398,9 @@ public class SmartCrackMeasurement : MonoBehaviour
         targetTexture.SetPixels32(cols);
         targetTexture.Apply();
         rndr.material.mainTexture = targetTexture;
+        DateTime end = DateTime.Now;
+        TimeSpan ts = end - start;
+        ProcessingTime = ts.TotalMilliseconds;
+        //MaxThicknessIn_mm = (float)ProcessingTime / 1000;
     }
 }
